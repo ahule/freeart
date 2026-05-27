@@ -8,9 +8,12 @@
 using namespace std;
 
 
-struct packethdr {
+struct packethdr { // FCP : Freeart Chat Protocol
     int type;   // 1: Login, 2: Message, 3: Exit
     int length;
+    char magic[3];
+    char version[3]; // "1.01"
+    char sender[16];
 };
 int login = false;
 string SERVER_IP = "127.0.0.1";
@@ -19,6 +22,7 @@ void send_packet(int sockfd, int packet_type, const string& message) {
     packethdr header;
     header.type = packet_type;
     header.length = strlen(message.c_str());
+    strncpy(header.magic, "FCP", 3);
 
     send(sockfd, &header, sizeof(header), 0);
 

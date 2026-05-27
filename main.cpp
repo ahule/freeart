@@ -6,6 +6,7 @@
 #include <thread>
 #include <vector>
 #include <sstream>
+#include <mutex>
 
 using namespace std;
 
@@ -15,11 +16,52 @@ private:
     struct packethdr { // FCP : Freeart Chat Protocol
         int type;   // 1: Login, 2: Message, 3: Exit
         int length;
+        char magic[3];
+        char version[3]; // "1.01"
+        char sender[16];
     };
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     const char* SERVER_PASSWORD = "password";
     int fail = -1;
     int succ = 0;
+
+    vector<int> active_clients;
+    mutex clients_mutex;
+
+    bool recv_all(int socket, void* buffer, size_t length) {
+        char* ptr = static_cast<char*>(buffer);
+        while (length > 0) {
+            int bytes = recv(socket, ptr, length, 0);
+            if (bytes <= 0) { return false; }
+            ptr += bytes;
+            length -= bytes;
+        }
+        return true;
+    }
+
+    bool check_sockfd(int socket) {
+        for (auto i : active_clients) {
+            if (i == socket) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    template<typename container>
+    void print_container(const container& c, char delimiter, bool numbering) {
+        if (numbering) {
+            int j = 1;
+            for (const auto& i : c) {
+                cout << j << ". " << i << delimiter;
+                j++;
+            }
+        }else {
+            for (const auto& i : c) {
+                cout << i << delimiter;
+            }
+        }
+    }
 
     vector<string> strcut(const string& str, char delimiter) {
         vector<string> result;
@@ -40,8 +82,12 @@ private:
         while (!login) {
             packethdr header;
 
-            int bytes = recv(client_socket, &header, sizeof(header), 0);
-            if (bytes <= 0) return;
+            if (!recv_all(client_socket, &header, sizeof(header))) return;
+
+            if (strncmp(header.magic, "FCP", 3) != 0) {
+                close(client_socket);
+                return;
+            }
 
             if (header.type == 1 && header.length > 0) {
                 char* loginbfr = new char[header.length + 1];
@@ -56,6 +102,8 @@ private:
                     } else {
                         cout << "[Login] Client (" << client_socket << ") authenticated successfully!" << endl;
                         send(client_socket, &succ, sizeof(succ), 0);
+                        lock_guard<mutex> lock(clients_mutex);
+                        active_clients.push_back(client_socket);
                         login = true;
                     }
                 }
@@ -73,6 +121,10 @@ private:
                 break;
             }
 
+            if (strncmp(header.magic, "FCP", 3) != 0) {
+                break;
+            }
+
             if (header.length > 0) {
                 char* buffer = new char[header.length + 1];
                 int rmsg = recv(client_socket, buffer, header.length, 0);
@@ -83,6 +135,16 @@ private:
                     cout << "Command: " << flush;
                 }
                 delete[] buffer;
+            }
+        }
+
+        {
+            lock_guard<mutex> lock(clients_mutex);
+            for (auto it = active_clients.begin(); it != active_clients.end(); ++it) {
+                if (*it == client_socket) {
+                    active_clients.erase(it);
+                    break;
+                }
             }
         }
         close(client_socket);
@@ -107,8 +169,18 @@ private:
                     continue;
                 }
                 int client_socket = stoi(cmds[1]);
+                if (!check_sockfd(client_socket)) {
+                    cout << "[Server Error]: Socket ID Not Found. Usage: disconnect <socket_id>" << endl;
+                    continue;
+                };
                 close(client_socket);
                 cout << "[Server]: disconnecting client on socket (" << client_socket <<")" << endl;
+            }else if (cmds[0] == "list") {
+                if (active_clients.empty()) {
+                    cout << "[Server]: No active clients." << endl;
+                }else {
+                    print_container(active_clients, '\n', true);
+                }
             }
         }
     }
@@ -173,8 +245,6 @@ public:
 server(const server&) = delete;
 server& operator=(const server&) = delete;
 };
-
-
 
 int main() {
     server s;
