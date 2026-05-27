@@ -53,7 +53,6 @@ int main() {
     }
 
     // login
-    // login
     while (true) {
         string msg = "";
         cout << "Login: ";
