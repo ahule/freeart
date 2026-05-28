@@ -64,6 +64,28 @@ void launch_test_client(int client_id) {
     close(sock);
 }
 
+void send_packet(int sockfd, int packet_type, const string& message) {
+    packethdr header;
+    memset(&header, 0, sizeof(header));
+
+    header.type = packet_type;
+    header.length = strlen(message.c_str());
+    strncpy(header.magic, "FCP", 3);
+    strncpy(header.version, "1.0", 3);
+
+    if (header.length > 0) {
+        header.checksum = checksum(message.c_str(), header.length);
+    } else {
+        header.checksum = 0;
+    }
+
+    send(sockfd, &header, sizeof(header), 0);
+
+    if (header.length > 0) {
+        send(sockfd, message.c_str(), header.length, 0);
+    }
+}
+
 int main() {
     vector<thread> test_threads;
     for (int i = 1; i <= 3; ++i) {

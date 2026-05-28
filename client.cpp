@@ -1,33 +1,28 @@
 #include <cstring>
 #include <iostream>
+#include <thread>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <string>
+#include "fcp.h"
 
 using namespace std;
 
-
-struct packethdr { // FCP : Freeart Chat Protocol
-    int type;   // 1: Login, 2: Message, 3: Exit
-    int length;
-    char magic[3];
-    char version[3]; // "1.01"
-    char sender[16];
-};
 int login = false;
 string SERVER_IP = "127.0.0.1";
 
-void send_packet(int sockfd, int packet_type, const string& message) {
-    packethdr header;
-    header.type = packet_type;
-    header.length = strlen(message.c_str());
-    strncpy(header.magic, "FCP", 3);
-
-    send(sockfd, &header, sizeof(header), 0);
-
-    if (header.length > 0) {
-        send(sockfd, message.c_str(), header.length, 0);
+void recv_chat(int sockfd) {
+    while (true) {
+        packethdr header;
+        char* buffer = recv_packet(sockfd, header);
+        if (buffer == nullptr) {
+            continue;
+        }
+        
+        cout << "\r[" << header.sender << "]: " << buffer << "\nclient: " << flush;
+        delete[] buffer;
     }
 }
 
@@ -84,10 +79,15 @@ int main() {
     }
 
     // send messages
+    if (login) {
+        thread(recv_chat, sockfd).detach();
+    }
     while (login) {
         string msg = "";
-        cout << "client: ";
+        cout << "client: " << flush;
         getline(cin, msg);
+        if (msg.empty()) continue;
+
         send_packet(sockfd, 2, msg);
     }
 

@@ -5,4 +5,5 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(freeart main.cpp
         labs.cpp
-        client.cpp)
+        client.cpp
+        fcp.h)

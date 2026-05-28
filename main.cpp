@@ -7,19 +7,18 @@
 #include <vector>
 #include <sstream>
 #include <mutex>
+#include "fcp.h"
 
 using namespace std;
 
+class thread_pool {
+private:
+
+public:
+};
 
 class server {
 private:
-    struct packethdr { // FCP : Freeart Chat Protocol
-        int type;   // 1: Login, 2: Message, 3: Exit
-        int length;
-        char magic[3];
-        char version[3]; // "1.01"
-        char sender[16];
-    };
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     const char* SERVER_PASSWORD = "password";
     int fail = -1;
@@ -28,22 +27,10 @@ private:
     vector<int> active_clients;
     mutex clients_mutex;
 
-    bool recv_all(int socket, void* buffer, size_t length) {
-        char* ptr = static_cast<char*>(buffer);
-        while (length > 0) {
-            int bytes = recv(socket, ptr, length, 0);
-            if (bytes <= 0) { return false; }
-            ptr += bytes;
-            length -= bytes;
-        }
-        return true;
-    }
-
     bool check_sockfd(int socket) {
+        lock_guard<mutex> lock(clients_mutex);
         for (auto i : active_clients) {
-            if (i == socket) {
-                return true;
-            }
+            if (i == socket) return true;
         }
         return false;
     }
@@ -76,13 +63,23 @@ private:
         return result;
     }
 
+    void send_to_chat(int client_socket, string buffer) {
+        lock_guard<mutex> lock(clients_mutex);
+        for (auto i : active_clients) {
+            if (i == client_socket) {
+                continue;
+            }
+            send_packet(i, 2, buffer);
+        }
+    }
+
     void handle_client(int client_socket) {
         bool login = false;
 
         while (!login) {
             packethdr header;
 
-            if (!recv_all(client_socket, &header, sizeof(header))) return;
+            if (!recv_all(client_socket, &header, sizeof(header))) break;
 
             if (strncmp(header.magic, "FCP", 3) != 0) {
                 close(client_socket);
@@ -131,6 +128,7 @@ private:
 
                 if (rmsg > 0) {
                     buffer[rmsg] = '\0';
+                    send_to_chat(client_socket, buffer);
                     cout << "[" << client_socket << "]: " << buffer << endl;
                     cout << "Command: " << flush;
                 }
@@ -176,6 +174,7 @@ private:
                 close(client_socket);
                 cout << "[Server]: disconnecting client on socket (" << client_socket <<")" << endl;
             }else if (cmds[0] == "list") {
+                lock_guard<mutex> lock(clients_mutex);
                 if (active_clients.empty()) {
                     cout << "[Server]: No active clients." << endl;
                 }else {
