@@ -6,4 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 add_executable(freeart main.cpp
         labs.cpp
         client.cpp
-        fcp.h)
+        fcp.h
+        clab.cpp
+        clab.cpp
+)

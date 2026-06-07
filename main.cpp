@@ -110,7 +110,7 @@ void worker_thread_loop(int thread_id) {
                 string sender(current_header.sender);
                 if (sender.empty()) sender = "Anonymous";
 
-                cout << "[" << sender << "]: " << buffer << endl;
+                cout << "[" << sender << ":" << task.clientfd << "]: " << buffer << endl;
                 broadcast_to_all(task.clientfd, sender, buffer);
             }
 

@@ -186,4 +186,56 @@ inline int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
     return 0;
 }
 
+
+class fcp_memory_pool {
+private:
+    struct node {
+        node* next;
+    };
+
+    size_t pool_size;
+    size_t chunk_size;
+    node* free_list;
+    void* pool_start;
+
+    const int ALLOC_PACKET_SIZE = 1024 * 1024;
+public:
+    fcp_memory_pool(size_t chunk_size, size_t chunksnum) {
+        if (chunk_size >= sizeof(node*)) {
+            this->chunk_size = chunk_size;
+        }else {
+            this->chunk_size = sizeof(node*);
+        }
+
+        pool_size = chunk_size * chunksnum;
+
+        pool_start = malloc(ALLOC_PACKET_SIZE);
+        free_list = static_cast<node*>(pool_start);
+
+        node* current = free_list;
+        for (int i = 1; i < chunksnum; ++i) {
+            current->next = reinterpret_cast<node*>(static_cast<char*>(pool_start) + (i * chunk_size));
+            current = current->next;
+        }
+        current->next = nullptr;
+    }
+    ~fcp_memory_pool() {
+        free(pool_start);
+    }
+
+    void* allocate() {
+        if (!free_list) return nullptr;
+        node* current = free_list;
+        free_list = free_list->next;
+        return current;
+    }
+
+    void deallocate(void* ptr) {
+        if (!ptr) return;
+        node* current = static_cast<node*>(ptr);
+        current->next = free_list;
+        free_list = current;
+    }
+};
+
 #endif //FREEART_FCP_H

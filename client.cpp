@@ -12,7 +12,7 @@
 using namespace std;
 
 bool login_flag = false;
-string SERVER_IP = "127.0.0.1";
+string SERVER_IP = "192.168.1.107";
 
 void recv_chat(int sockfd) {
     while (true) {
@@ -71,7 +71,6 @@ int main() {
         send_packet(sockfd, 1, msg);
 
         int login_status = 0;
-        // استخدام recv_all لضمان قراءة الـ 4 بايت كاملة دون تقطيع بالشبكة
         if (recv_all(sockfd, &login_status, sizeof(login_status))) {
             if (login_status == -1) {
                 cout << "Login Failed. Try again." << endl;
