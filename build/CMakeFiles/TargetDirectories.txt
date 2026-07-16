@@ -1,6 +1,0 @@
-/home/ahmad/CLionProjects/freeart/build/CMakeFiles/freeart.dir
-/home/ahmad/CLionProjects/freeart/build/CMakeFiles/client.dir
-/home/ahmad/CLionProjects/freeart/build/CMakeFiles/clab.dir
-/home/ahmad/CLionProjects/freeart/build/CMakeFiles/labs.dir
-/home/ahmad/CLionProjects/freeart/build/CMakeFiles/edit_cache.dir
-/home/ahmad/CLionProjects/freeart/build/CMakeFiles/rebuild_cache.dir

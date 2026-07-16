@@ -1,1 +1,0 @@
-/usr/bin/c++ CMakeFiles/freeart.dir/src/main.cpp.o CMakeFiles/freeart.dir/src/server.cpp.o CMakeFiles/freeart.dir/src/fcp.cpp.o -o freeart 
