@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/clab.dir/clab.cpp.o -o clab 

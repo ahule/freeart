@@ -1,43 +1,22 @@
-#ifndef FREEART_FCP_H
-#define FREEART_FCP_H
-
-#include <iostream>
-#include <vector>
+#include "../include/fcp.h"
 #include <cstring>
 #include <cerrno>
+#include <cstdlib>
 #include <sys/socket.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <algorithm>
 
 using namespace std;
 
-#pragma pack(push, 1)
-struct packethdr { // FCP : Freeart Chat Protocol
-    int type;   // 1: Login, 2: Message, 3: Exit
-    int length;
-    char magic[3];
-    char version[3]; // "1.0"
-    char sender[16];
-    unsigned int checksum = 0;
-};
-#pragma pack(pop)
-
-struct client_session {
-    int fd;
-    vector<char> headerbuf;
-    vector<char> bodybuf;
-    packethdr header;
-    bool header_ready = false;
-};
-
-inline void set_nonblocking(int fd) {
+void set_nonblocking(int fd) {
     int flags = fcntl(fd, F_GETFL, 0);
     if (flags != -1) {
         fcntl(fd, F_SETFL, flags | O_NONBLOCK);
     }
 }
 
-inline unsigned int checksum(const void* data, size_t length) {
+unsigned int checksum(const void* data, size_t length) {
     const uint16_t* ptr = static_cast<const uint16_t*>(data);
     uint32_t sum = 0;
 
@@ -55,7 +34,7 @@ inline unsigned int checksum(const void* data, size_t length) {
     return static_cast<uint16_t>(~sum);
 }
 
-inline bool recv_all(int socket, void* buffer, size_t length) {
+bool recv_all(int socket, void* buffer, size_t length) {
     char* ptr = static_cast<char*>(buffer);
     while (length > 0) {
         int bytes = recv(socket, ptr, length, 0);
@@ -66,14 +45,17 @@ inline bool recv_all(int socket, void* buffer, size_t length) {
     return true;
 }
 
-inline void send_packet(int sockfd, int packet_type, const string& message) {
-    packethdr header;
-    memset(&header, 0, sizeof(header));
+void send_packet(int sockfd, int packet_type, const string& message, const string& sender) {
+    packethdr header{};
 
     header.type = packet_type;
     header.length = message.length();
-    strncpy(header.magic, "FCP", 3);
-    strncpy(header.version, "1.0", 3);
+    memcpy(header.magic, "FCP", 3);
+    memcpy(header.version, "1.0", 3);
+    if (!sender.empty()) {
+        size_t len = std::min(sender.length(), sizeof(header.sender) - 1);
+        memcpy(header.sender, sender.c_str(), len);
+    }
 
     if (header.length > 0) {
         header.checksum = checksum(message.c_str(), header.length);
@@ -92,11 +74,11 @@ inline void send_packet(int sockfd, int packet_type, const string& message) {
     delete[] sendbuf;
 }
 
-inline char* recv_packet(int sockfd, packethdr& header) {
+char* recv_packet(int sockfd, packethdr& header) {
     if (!recv_all(sockfd, &header, sizeof(header))) {
         return nullptr;
     }
-    if (header.magic[0] != 'F' || header.magic[1] != 'C' || header.magic[2] != 'P') {
+    if (header.magic[0] != 'F' || header.magic[1] != 'C' || header.magic[2] != 'P' || header.length < 0) {
         return nullptr;
     }
     if (header.length > 0) {
@@ -112,7 +94,7 @@ inline char* recv_packet(int sockfd, packethdr& header) {
     return nullptr;
 }
 
-inline int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
+int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
     out_buffer = nullptr;
 
     if (!session.header_ready) {
@@ -128,7 +110,7 @@ inline int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
             if (session.headerbuf.size() == sizeof(packethdr)) {
                 memcpy(&session.header, session.headerbuf.data(), sizeof(packethdr));
 
-                if (session.header.magic[0] != 'F' || session.header.magic[1] != 'C' || session.header.magic[2] != 'P') {
+                if (session.header.magic[0] != 'F' || session.header.magic[1] != 'C' || session.header.magic[2] != 'P' || session.header.length < 0) {
                     return -1;
                 }
                 session.header_ready = true;
@@ -153,7 +135,7 @@ inline int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
         }
 
         size_t current_body_size = session.bodybuf.size();
-        size_t body_bytes_needed = session.header.length - current_body_size;
+        size_t body_bytes_needed = static_cast<size_t>(session.header.length) - current_body_size;
 
         vector<char> temp_body(body_bytes_needed);
         int bytes_recv = recv(session.fd, temp_body.data(), body_bytes_needed, 0);
@@ -168,7 +150,7 @@ inline int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
             return -1;
         }
 
-        if (session.bodybuf.size() == session.header.length) {
+        if (session.bodybuf.size() == static_cast<size_t>(session.header.length)) {
             out_buffer = new char[session.header.length + 1];
             memcpy(out_buffer, session.bodybuf.data(), session.header.length);
             out_buffer[session.header.length] = '\0';
@@ -186,56 +168,39 @@ inline int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
     return 0;
 }
 
-
-class fcp_memory_pool {
-private:
-    struct node {
-        node* next;
-    };
-
-    size_t pool_size;
-    size_t chunk_size;
-    node* free_list;
-    void* pool_start;
-
-    const int ALLOC_PACKET_SIZE = 1024 * 1024;
-public:
-    fcp_memory_pool(size_t chunk_size, size_t chunksnum) {
-        if (chunk_size >= sizeof(node*)) {
-            this->chunk_size = chunk_size;
-        }else {
-            this->chunk_size = sizeof(node*);
-        }
-
-        pool_size = chunk_size * chunksnum;
-
-        pool_start = malloc(ALLOC_PACKET_SIZE);
-        free_list = static_cast<node*>(pool_start);
-
-        node* current = free_list;
-        for (int i = 1; i < chunksnum; ++i) {
-            current->next = reinterpret_cast<node*>(static_cast<char*>(pool_start) + (i * chunk_size));
-            current = current->next;
-        }
-        current->next = nullptr;
-    }
-    ~fcp_memory_pool() {
-        free(pool_start);
+fcp_memory_pool::fcp_memory_pool(size_t chunk_size, size_t chunksnum) {
+    if (chunk_size >= sizeof(node*)) {
+        this->chunk_size = chunk_size;
+    } else {
+        this->chunk_size = sizeof(node*);
     }
 
-    void* allocate() {
-        if (!free_list) return nullptr;
-        node* current = free_list;
-        free_list = free_list->next;
-        return current;
-    }
+    pool_size = this->chunk_size * chunksnum;
+    pool_start = malloc(pool_size);
+    free_list = static_cast<node*>(pool_start);
 
-    void deallocate(void* ptr) {
-        if (!ptr) return;
-        node* current = static_cast<node*>(ptr);
-        current->next = free_list;
-        free_list = current;
+    node* current = free_list;
+    for (size_t i = 1; i < chunksnum; ++i) {
+        current->next = reinterpret_cast<node*>(static_cast<char*>(pool_start) + (i * this->chunk_size));
+        current = current->next;
     }
-};
+    current->next = nullptr;
+}
 
-#endif //FREEART_FCP_H
+fcp_memory_pool::~fcp_memory_pool() {
+    free(pool_start);
+}
+
+void* fcp_memory_pool::allocate() {
+    if (!free_list) return nullptr;
+    node* current = free_list;
+    free_list = free_list->next;
+    return current;
+}
+
+void fcp_memory_pool::deallocate(void* ptr) {
+    if (!ptr) return;
+    node* current = static_cast<node*>(ptr);
+    current->next = free_list;
+    free_list = current;
+}
