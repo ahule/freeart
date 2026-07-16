@@ -1,8 +1,6 @@
 cmake-build-debug/
 .idea/
-*.o
-main
-.gitingore
-clab.cpp
 build/
 .junie/
+*.o
+.gitingore
