@@ -3,4 +3,3 @@ cmake-build-debug/
 build/
 .junie/
 *.o
-.gitingore
