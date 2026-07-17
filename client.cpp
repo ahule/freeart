@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <string>
 
-#include "include/fcp.h"
+#include "fcp.h"
 
 using namespace std;
 
@@ -68,7 +68,7 @@ int main() {
             return 0;
         }
 
-        send_packet(sockfd, 1, msg);
+        send_packet(sockfd, LOGIN, msg);
 
         int login_status = 0;
         if (recv_all(sockfd, &login_status, sizeof(login_status))) {
@@ -98,7 +98,7 @@ int main() {
 
         if (msg == "exit") break;
 
-        send_packet(sockfd, 2, msg);
+        send_packet(sockfd, MESSAGE, msg);
     }
 
     close(sockfd);

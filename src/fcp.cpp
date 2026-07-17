@@ -1,4 +1,4 @@
-#include "../include/fcp.h"
+#include "fcp.h"
 #include <cstring>
 #include <cerrno>
 #include <cstdlib>

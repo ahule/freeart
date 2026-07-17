@@ -1,10 +1,10 @@
 #ifndef FREEART_FCP_H
 #define FREEART_FCP_H
 
-#include <iostream>
 #include <vector>
 #include <string>
 #include <cstdint>
+#include <mutex>
 
 #pragma pack(push, 1)
 struct packethdr { // FCP : Freeart Chat Protocol
@@ -17,8 +17,15 @@ struct packethdr { // FCP : Freeart Chat Protocol
 };
 #pragma pack(pop)
 
+enum TYPE {
+    LOGIN = 1,
+    MESSAGE = 2,
+    EXIT = 3,
+};
+
 struct client_session {
     int fd;
+    std::mutex mutex;
     std::vector<char> headerbuf;
     std::vector<char> bodybuf;
     packethdr header;

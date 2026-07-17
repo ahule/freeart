@@ -7,6 +7,7 @@
 #include <condition_variable>
 #include <unordered_map>
 #include <string>
+#include <iostream>
 #include "fcp.h"
 
 struct code_task {
@@ -29,7 +30,7 @@ private:
     std::condition_variable pool_cv;
     bool server_running = true;
 
-    std::unordered_map<int, client_session> client_sessions;
+    std::unordered_map<int, std::shared_ptr<client_session>> client_sessions;
     std::mutex sessions_mutex;
 
     void worker_thread_loop(int thread_id);

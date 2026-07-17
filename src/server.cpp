@@ -1,4 +1,4 @@
-#include "../include/server.h"
+#include "server.h"
 #include <iostream>
 #include <cstring>
 #include <thread>
@@ -25,7 +25,7 @@ void server::broadcast_to_all(int sender_fd, const string& sender_name, const st
     lock_guard<mutex> lock(clients_mutex);
     for (int client_fd : active_clients) {
         if (client_fd != sender_fd) {
-            send_packet(client_fd, 2, message, sender_name);
+            send_packet(client_fd, MESSAGE, message, sender_name);
         }
     }
 }
@@ -74,18 +74,24 @@ void server::worker_thread_loop(int thread_id) {
         int result = 0;
         packethdr current_header;
 
+        std::shared_ptr<client_session> session = nullptr;
         {
             lock_guard<mutex> session_lock(sessions_mutex);
-            auto& session = client_sessions[task.clientfd];
-            session.fd = task.clientfd;
+            if (client_sessions.find(task.clientfd) != client_sessions.end()) {
+                session = client_sessions[task.clientfd];
+            }
+        }
+        if (session != nullptr) {
+            lock_guard<mutex> client_lock(session->mutex);
 
-            result = recv_packet_nonblocking(session, buffer);
+            session->fd = task.clientfd;
+            result = recv_packet_nonblocking(*session, buffer);
 
             if (result == 1 && buffer != nullptr) {
-                current_header = session.header;
-                session.headerbuf.clear();
-                session.bodybuf.clear();
-                session.header_ready = false;
+                current_header = session->header;
+                session->headerbuf.clear();
+                session->bodybuf.clear();
+                session->header_ready = false;
             }
             else if (result == -1) {
                 should_close = true;
@@ -252,6 +258,12 @@ void server::server_main() {
                 client_ev.events = EPOLLIN | EPOLLONESHOT;
                 client_ev.data.fd = client_socket;
                 epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_socket, &client_ev);
+
+                {
+                    lock_guard<mutex> lock(sessions_mutex);
+                    client_sessions[client_socket] = std::make_shared<client_session>();
+                    client_sessions[client_socket]->fd = client_socket;
+                }
 
                 cout << "[Epoll] A new connection has been accepted ("<< client_socket << ")..." << endl;
                 cout << "Command: " << flush;
