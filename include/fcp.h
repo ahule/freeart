@@ -1,9 +1,7 @@
 #ifndef FREEART_FCP_H
 #define FREEART_FCP_H
 
-#include <vector>
 #include <string>
-#include <cstdint>
 #include <mutex>
 
 #pragma pack(push, 1)
@@ -23,13 +21,19 @@ enum TYPE {
     EXIT = 3,
 };
 
+constexpr int MAX_PACKET_SIZE = 1024;
+
 struct client_session {
     int fd;
     std::mutex mutex;
-    std::vector<char> headerbuf;
-    std::vector<char> bodybuf;
+    char* buf;
+    size_t bytes_received;
     packethdr header;
     bool header_ready = false;
+    client_session() {
+        buf = new char[MAX_PACKET_SIZE];
+        bytes_received = 0;
+    }
 };
 
 void set_nonblocking(int fd);
@@ -38,24 +42,5 @@ bool recv_all(int socket, void* buffer, size_t length);
 void send_packet(int sockfd, int packet_type, const std::string& message, const std::string& sender = "");
 char* recv_packet(int sockfd, packethdr& header);
 int recv_packet_nonblocking(client_session& session, char*& out_buffer);
-
-class fcp_memory_pool {
-private:
-    struct node {
-        node* next;
-    };
-
-    size_t pool_size;
-    size_t chunk_size;
-    node* free_list;
-    void* pool_start;
-
-public:
-    fcp_memory_pool(size_t chunk_size, size_t chunksnum);
-    ~fcp_memory_pool();
-
-    void* allocate();
-    void deallocate(void* ptr);
-};
 
 #endif //FREEART_FCP_H

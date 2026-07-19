@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <algorithm>
+#include <iostream>
 
 using namespace std;
 
@@ -70,7 +71,10 @@ void send_packet(int sockfd, int packet_type, const string& message, const strin
         memcpy(sendbuf + sizeof(header), message.c_str(), header.length);
     }
 
-    send(sockfd, sendbuf, total_size, 0);
+    ssize_t sent = send(sockfd, sendbuf, total_size, 0);
+    if (sent <= 0) {
+        return;
+    }
     delete[] sendbuf;
 }
 
@@ -98,17 +102,15 @@ int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
     out_buffer = nullptr;
 
     if (!session.header_ready) {
-        size_t current_size = session.headerbuf.size();
-        size_t bytes_needed = sizeof(packethdr) - current_size;
+        size_t bytes_needed = sizeof(packethdr) - session.bytes_received;
 
-        vector<char> temp_buf(bytes_needed);
-        int bytes_recv = recv(session.fd, temp_buf.data(), bytes_needed, 0);
+        int bytes_recv = recv(session.fd, session.buf + session.bytes_received, bytes_needed, 0);
 
         if (bytes_recv > 0) {
-            session.headerbuf.insert(session.headerbuf.end(), temp_buf.begin(), temp_buf.begin() + bytes_recv);
+            session.bytes_received += bytes_recv;
 
-            if (session.headerbuf.size() == sizeof(packethdr)) {
-                memcpy(&session.header, session.headerbuf.data(), sizeof(packethdr));
+            if (session.bytes_received >= sizeof(packethdr)) {
+                memcpy(&session.header, session.buf, sizeof(packethdr));
 
                 if (session.header.magic[0] != 'F' || session.header.magic[1] != 'C' || session.header.magic[2] != 'P' || session.header.length < 0) {
                     return -1;
@@ -131,17 +133,20 @@ int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
         if (session.header.length == 0) {
             out_buffer = new char[1];
             out_buffer[0] = '\0';
+            session.bytes_received = 0;
+            session.header_ready = false;
             return 1;
         }
 
-        size_t current_body_size = session.bodybuf.size();
+        size_t current_body_size = session.bytes_received - sizeof(packethdr);
         size_t body_bytes_needed = static_cast<size_t>(session.header.length) - current_body_size;
 
-        vector<char> temp_body(body_bytes_needed);
-        int bytes_recv = recv(session.fd, temp_body.data(), body_bytes_needed, 0);
+        int bytes_recv = recv(session.fd, session.buf + session.bytes_received, body_bytes_needed, 0);
+
+        char* body_buf = session.buf + sizeof(packethdr);
 
         if (bytes_recv > 0) {
-            session.bodybuf.insert(session.bodybuf.end(), temp_body.begin(), temp_body.begin() + bytes_recv);
+            session.bytes_received += bytes_recv;
         }
         else if (bytes_recv < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
             return 0;
@@ -150,10 +155,14 @@ int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
             return -1;
         }
 
-        if (session.bodybuf.size() == static_cast<size_t>(session.header.length)) {
+        if (session.bytes_received >= (sizeof(packethdr) + session.header.length)) {
+
             out_buffer = new char[session.header.length + 1];
-            memcpy(out_buffer, session.bodybuf.data(), session.header.length);
+            memcpy(out_buffer, body_buf, session.header.length);
             out_buffer[session.header.length] = '\0';
+
+            session.bytes_received = 0;
+            session.header_ready = false;
 
             if (session.header.checksum == checksum(out_buffer, session.header.length)) {
                 return 1;
@@ -166,41 +175,4 @@ int recv_packet_nonblocking(client_session& session, char*& out_buffer) {
     }
 
     return 0;
-}
-
-fcp_memory_pool::fcp_memory_pool(size_t chunk_size, size_t chunksnum) {
-    if (chunk_size >= sizeof(node*)) {
-        this->chunk_size = chunk_size;
-    } else {
-        this->chunk_size = sizeof(node*);
-    }
-
-    pool_size = this->chunk_size * chunksnum;
-    pool_start = malloc(pool_size);
-    free_list = static_cast<node*>(pool_start);
-
-    node* current = free_list;
-    for (size_t i = 1; i < chunksnum; ++i) {
-        current->next = reinterpret_cast<node*>(static_cast<char*>(pool_start) + (i * this->chunk_size));
-        current = current->next;
-    }
-    current->next = nullptr;
-}
-
-fcp_memory_pool::~fcp_memory_pool() {
-    free(pool_start);
-}
-
-void* fcp_memory_pool::allocate() {
-    if (!free_list) return nullptr;
-    node* current = free_list;
-    free_list = free_list->next;
-    return current;
-}
-
-void fcp_memory_pool::deallocate(void* ptr) {
-    if (!ptr) return;
-    node* current = static_cast<node*>(ptr);
-    current->next = free_list;
-    free_list = current;
 }

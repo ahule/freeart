@@ -6,12 +6,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <string>
+#include <atomic>
 
-#include "fcp.h"
+#include "include/fcp.h"
 
 using namespace std;
 
-bool login_flag = false;
+std::atomic<bool> login_flag = false;
 string SERVER_IP = "192.168.1.107";
 
 void recv_chat(int sockfd) {
@@ -19,10 +20,13 @@ void recv_chat(int sockfd) {
         packethdr header;
 
         char* buffer = recv_packet(sockfd, header);
-        if (buffer == nullptr) {
+
+        if (header.type == EXIT || buffer == nullptr) {
             cout << "\n[Disconnected] Lost connection to server or invalid packet received." << endl;
             close(sockfd);
-            exit(0);
+
+            login_flag = false;
+            break;
         }
 
         string sender_name(header.sender);

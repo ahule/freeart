@@ -6,17 +6,21 @@ add_compile_options(-Wall -Wextra)
 
 include_directories(include)
 
-file(GLOB_RECURSE SOURCES "src/*.cpp" "main.cpp")
-
-add_executable(freeart ${SOURCES}
-        include/server.h
-        include/fcp.h
-        src/fcp.cpp
-        src/server.cpp
-)
-
 find_package(Threads REQUIRED)
+
+add_executable(freeart
+        main.cpp
+        src/server.cpp
+        src/fcp.cpp
+)
 target_link_libraries(freeart PRIVATE Threads::Threads)
 
-add_executable(client client.cpp src/fcp.cpp)
-target_link_libraries(client PRIVATE Threads::Threads)
+add_executable(benchmark
+        src/benchmark.cpp
+        src/fcp.cpp
+)
+add_executable(client
+        client.cpp
+        src/fcp.cpp
+)
+target_link_libraries(benchmark PRIVATE Threads::Threads)

@@ -89,8 +89,12 @@ void server::worker_thread_loop(int thread_id) {
 
             if (result == 1 && buffer != nullptr) {
                 current_header = session->header;
-                session->headerbuf.clear();
-                session->bodybuf.clear();
+
+                // session->headerbuf.clear();
+                // session->bodybuf.clear();
+                // delete[] session->buf;
+                // session->buf = nullptr;
+
                 session->header_ready = false;
             }
             else if (result == -1) {
@@ -103,7 +107,6 @@ void server::worker_thread_loop(int thread_id) {
                 if (current_header.type == 1 && strcmp(buffer, SERVER_PASSWORD) == 0) {
                     cout << "[Login] Client (" << task.clientfd << ") authenticated successfully!" << endl;
                     send(task.clientfd, &succ, sizeof(succ), 0);
-
                     {
                         lock_guard<mutex> lock(clients_mutex);
                         active_clients.push_back(task.clientfd);
@@ -136,6 +139,10 @@ void server::worker_thread_loop(int thread_id) {
             }
             epoll_ctl(task.epollfd, EPOLL_CTL_DEL, task.clientfd, nullptr);
             close(task.clientfd);
+
+            // send exit message to client
+            send_packet(task.clientfd, EXIT, "EXIT", "SERVER");
+
             cout << "[Server] Client [" << task.clientfd << "] disconnected/cleared." << endl;
             cout << "Command: " << flush;
         }

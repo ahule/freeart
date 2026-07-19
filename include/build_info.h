@@ -2,7 +2,7 @@
 
 namespace info {
 
-    inline constexpr const char* TOOL_NAME = "FreeArt";
-    inline constexpr const char* VERSION    = "0.02";
+    inline constexpr const char* NAME = "FreeArt";
+    inline constexpr const char* VERSION = "0.03";
 
 }
