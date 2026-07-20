@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FreeArt — Server Core</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #0a0c10;
+            --bg-card: #0f1318;
+            --bg-code: #131820;
+            --border: #1e2530;
+            --border-hl: #2a3545;
+            --accent: #4f9eff;
+            --accent-2: #7ecfff;
+            --accent-dim: #1a3a5c;
+            --green: #3dd68c;
+            --amber: #f4a535;
+            --red: #ff5f57;
+            --text-1: #e8edf5;
+            --text-2: #8a99b0;
+            --text-3: #4a5568;
+            --glow: 0 0 40px rgba(79, 158, 255, .08);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text-1);
+            line-height: 1.7;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── background grid ── */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(79, 158, 255, .03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(79, 158, 255, .03) 1px, transparent 1px);
+            background-size: 48px 48px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── nav ── */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2.5rem;
+            height: 60px;
+            background: rgba(10, 12, 16, .85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .nav-logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .9rem;
+            font-weight: 500;
+            color: var(--accent);
+            letter-spacing: .04em;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            font-size: .82rem;
+            font-weight: 500;
+            color: var(--text-2);
+            text-decoration: none;
+            letter-spacing: .03em;
+            transition: color .2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent);
+        }
+
+        /* ── layout ── */
+        .page {
+            position: relative;
+            z-index: 1;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* ── hero ── */
+        .hero {
+            padding: 7rem 2rem 5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero-glow {
+            position: absolute;
+            top: 30%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 300px;
+            background: radial-gradient(ellipse, rgba(79, 158, 255, .12) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: .5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .72rem;
+            font-weight: 500;
+            color: var(--accent);
+            background: rgba(79, 158, 255, .08);
+            border: 1px solid rgba(79, 158, 255, .2);
+            border-radius: 100px;
+            padding: .35rem .9rem;
+            margin-bottom: 2rem;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+
+        .badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: .3;
+            }
+        }
+
+        h1 {
+            font-size: clamp(2.8rem, 6vw, 4.5rem);
+            font-weight: 700;
+            letter-spacing: -.03em;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--text-1) 30%, var(--accent-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-sub {
+            font-size: 1.15rem;
+            color: var(--text-2);
+            max-width: 600px;
+            margin: 0 auto 3rem;
+            font-weight: 400;
+        }
+
+        .hero-meta {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: .5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .78rem;
+            color: var(--text-3);
+        }
+
+        .meta-item span {
+            color: var(--text-2);
+        }
+
+        /* ── section ── */
+        section {
+            padding: 5rem 0;
+            border-top: 1px solid var(--border);
+        }
+
+        .section-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .7rem;
+            font-weight: 500;
+            color: var(--accent);
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            margin-bottom: .75rem;
+        }
+
+        h2 {
+            font-size: 1.9rem;
+            font-weight: 700;
+            letter-spacing: -.02em;
+            color: var(--text-1);
+            margin-bottom: 1.25rem;
+        }
+
+        p {
+            color: var(--text-2);
+            margin-bottom: 1rem;
+        }
+
+        p:last-child {
+            margin-bottom: 0;
+        }
+
+        /* ── cards ── */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            margin-top: 2.5rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            padding: 2rem;
+            transition: background .2s;
+        }
+
+        .card:hover {
+            background: #131a22;
+        }
+
+        .card-icon {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .card h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-1);
+            margin-bottom: .5rem;
+            letter-spacing: -.01em;
+        }
+
+        .card p {
+            font-size: .875rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* ── code block ── */
+        .code-block {
+            background: var(--bg-code);
+            border: 1px solid var(--border-hl);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 2rem;
+        }
+
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: .75rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, .02);
+        }
+
+        .code-dots {
+            display: flex;
+            gap: .4rem;
+        }
+
+        .code-dots span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .code-dots span:nth-child(1) {
+            background: var(--red);
+        }
+
+        .code-dots span:nth-child(2) {
+            background: var(--amber);
+        }
+
+        .code-dots span:nth-child(3) {
+            background: var(--green);
+        }
+
+        .code-title {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .72rem;
+            color: var(--text-3);
+            letter-spacing: .06em;
+        }
+
+        pre {
+            padding: 1.5rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .82rem;
+            line-height: 1.75;
+            color: var(--text-2);
+        }
+
+        .kw {
+            color: #c792ea;
+        }
+
+        .tp {
+            color: var(--accent-2);
+        }
+
+        .fn {
+            color: var(--green);
+        }
+
+        .cm {
+            color: var(--text-3);
+            font-style: italic;
+        }
+
+        .st {
+            color: var(--amber);
+        }
+
+        /* ── pillars ── */
+        .pillars {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2.5rem;
+        }
+
+        .pillar {
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--bg-card);
+        }
+
+        .pillar-num {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .7rem;
+            color: var(--accent);
+            margin-bottom: .75rem;
+            letter-spacing: .06em;
+        }
+
+        .pillar h3 {
+            font-size: .95rem;
+            font-weight: 600;
+            color: var(--text-1);
+            margin-bottom: .4rem;
+        }
+
+        .pillar p {
+            font-size: .82rem;
+            line-height: 1.55;
+            margin: 0;
+        }
+
+        /* ── license box ── */
+        .license-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem 2.5rem;
+            margin-top: 2rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1.5rem;
+        }
+
+        .license-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+            margin-top: .1rem;
+        }
+
+        .license-box h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-1);
+            margin-bottom: .4rem;
+        }
+
+        .license-box p {
+            font-size: .875rem;
+            margin: 0;
+        }
+
+        /* ── author ── */
+        .author-card {
+            background: linear-gradient(135deg, rgba(79, 158, 255, .06), rgba(126, 207, 255, .03));
+            border: 1px solid rgba(79, 158, 255, .15);
+            border-radius: 16px;
+            padding: 2.5rem;
+            margin-top: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .author-avatar {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-dim), #0d2240);
+            border: 2px solid rgba(79, 158, 255, .3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .author-name {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-1);
+            letter-spacing: -.01em;
+        }
+
+        .author-handle {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .78rem;
+            color: var(--accent);
+            margin-top: .2rem;
+        }
+
+        .author-desc {
+            font-size: .875rem;
+            color: var(--text-2);
+            margin-top: .6rem;
+            margin-bottom: 0;
+        }
+
+        /* ── footer ── */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 2.5rem 2rem;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: .75rem;
+            color: var(--text-3);
+        }
+
+        footer span {
+            color: var(--text-2);
+        }
+
+        /* ── responsive ── */
+        @media (max-width: 640px) {
+            nav {
+                padding: 0 1.25rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .hero {
+                padding: 4rem 1.25rem 3rem;
+            }
+
+            .container {
+                padding: 0 1.25rem;
+            }
+
+            .author-card {
+                flex-direction: column;
+                gap: 1.25rem;
+            }
+
+            .license-box {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav>
+        <div class="nav-logo">freeart/core</div>
+        <div class="nav-links">
+            <a href="#philosophy">Philosophy</a>
+            <a href="#concept">Core Concept</a>
+            <a href="#usage">Usage</a>
+            <a href="#author">Author</a>
+            <a href="#license">License</a>
+        </div>
+    </nav>
+
+    <div class="page">
+
+        <!-- HERO -->
+        <div class="hero">
+            <div class="hero-glow"></div>
+            <div class="badge">C++20 · Linux · Open Source</div>
+            <h1>FreeArt</h1>
+            <p class="hero-sub">
+                A minimal, high-performance server kernel for Linux written in C++20.
+                Build any networked application on top of a solid, protocol-agnostic foundation.
+            </p>
+            <div class="hero-meta">
+                <div class="meta-item">lang: <span>C++20</span></div>
+                <div class="meta-item">io: <span>epoll + EPOLLONESHOT</span></div>
+                <div class="meta-item">model: <span>thread pool</span></div>
+                <div class="meta-item">license: <span>GPLv2</span></div>
+            </div>
+        </div>
+
+        <!-- PHILOSOPHY -->
+        <section id="philosophy">
+            <div class="container">
+                <div class="section-label">// philosophy</div>
+                <h2>The Kernel Idea</h2>
+                <p>
+                    Most networked software reimplements the same infrastructure over and over —
+                    the event loop, the thread pool, the connection lifecycle, the I/O buffer management.
+                    FreeArt exists to eliminate that repetition.
+                </p>
+                <p>
+                    The concept borrows from the Linux kernel philosophy: the kernel does not decide
+                    what your application does. It provides a stable, efficient substrate that any
+                    application can be built upon. FreeArt is that substrate for TCP servers.
+                    You bring the protocol. FreeArt handles everything beneath it.
+                </p>
+                <p>
+                    A chat server, an HTTP server, a game server, a custom binary protocol daemon —
+                    all of these are just handlers sitting on top of the same core.
+                </p>
+
+                <div class="card-grid">
+                    <div class="card">
+                        <span class="card-icon">⚡</span>
+                        <h3>Protocol Agnostic</h3>
+                        <p>The core has no concept of HTTP, WebSocket, or any specific protocol. You define how bytes
+                            are interpreted.</p>
+                    </div>
+                    <div class="card">
+                        <span class="card-icon">🔩</span>
+                        <h3>Zero Overhead Abstraction</h3>
+                        <p>Connection state is templated. No virtual dispatch on the hot path, no heap allocation per
+                            message.</p>
+                    </div>
+                    <div class="card">
+                        <span class="card-icon">🧵</span>
+                        <h3>Concurrent by Design</h3>
+                        <p>epoll multiplexes connections. A thread pool processes events. The handler is called once per
+                            readable event.</p>
+                    </div>
+                    <div class="card">
+                        <span class="card-icon">🏗️</span>
+                        <h3>Build Anything</h3>
+                        <p>Implement three methods and you have a production-ready TCP server. The infrastructure is
+                            already there.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CORE CONCEPT -->
+        <section id="concept">
+            <div class="container">
+                <div class="section-label">// core concept</div>
+                <h2>How It Works</h2>
+                <p>
+                    FreeArt is structured around a single interface: <code
+                        style="font-family:'JetBrains Mono',monospace;color:var(--accent-2);font-size:.9em">ihandler&lt;T&gt;</code>.
+                    You implement this interface to define what your server does with a connection and its data.
+                    The core manages the rest.
+                </p>
+
+                <div class="pillars">
+                    <div class="pillar">
+                        <div class="pillar-num">01 — EVENT LOOP</div>
+                        <h3>epoll</h3>
+                        <p>A single epoll instance watches all file descriptors. New connections and readable events are
+                            detected with minimal system overhead.</p>
+                    </div>
+                    <div class="pillar">
+                        <div class="pillar-num">02 — DISPATCH</div>
+                        <h3>Thread Pool</h3>
+                        <p>Readable events are placed on a work queue and consumed by a pool of worker threads. No
+                            thread-per-connection cost.</p>
+                    </div>
+                    <div class="pillar">
+                        <div class="pillar-num">03 — STATE</div>
+                        <h3>connection&lt;T&gt;</h3>
+                        <p>Each connection carries a buffer and a user-defined context T. Your protocol state lives in T
+                            — typed, zero-cost, no dynamic allocation.</p>
+                    </div>
+                    <div class="pillar">
+                        <div class="pillar-num">04 — HANDLER</div>
+                        <h3>Your Code</h3>
+                        <p>Three callbacks: on_connect, on_data, on_disconnect. You parse, respond, and broadcast. The
+                            core handles threading and I/O.</p>
+                    </div>
+                </div>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <div class="code-title">THE ENTIRE API SURFACE</div>
+                    </div>
+                    <pre>
+<span class="kw">template</span>&lt;<span class="kw">typename</span> <span class="tp">T</span>&gt;
+<span class="kw">class</span> <span class="tp">ihandler</span> {
+<span class="kw">public</span>:
+    <span class="kw">virtual</span> <span class="kw">void</span> <span class="fn">on_connect</span>   (<span class="tp">server_core</span>&lt;<span class="tp">T</span>&gt;&amp; server, <span class="tp">connection</span>&lt;<span class="tp">T</span>&gt;&amp; conn) = 0;
+    <span class="kw">virtual</span> <span class="kw">int</span>  <span class="fn">on_data</span>      (<span class="tp">server_core</span>&lt;<span class="tp">T</span>&gt;&amp; server, <span class="tp">connection</span>&lt;<span class="tp">T</span>&gt;&amp; conn,
+                               <span class="kw">const</span> <span class="tp">uint8_t</span>* data, <span class="tp">size_t</span> len) = 0;
+    <span class="kw">virtual</span> <span class="kw">void</span> <span class="fn">on_disconnect</span>(<span class="tp">server_core</span>&lt;<span class="tp">T</span>&gt;&amp; server, <span class="tp">connection</span>&lt;<span class="tp">T</span>&gt;&amp; conn) = 0;
+};
+
+<span class="cm">// on_data: return bytes consumed, 0 for more data needed, -1 to close</span>
+</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- USAGE -->
+        <section id="usage">
+            <div class="container">
+                <div class="section-label">// usage</div>
+                <h2>Getting Started</h2>
+                <p>
+                    Define your context struct, implement the handler, instantiate the server.
+                    The example below is a complete, working TCP echo server.
+                </p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <div class="code-dots">
+                            <span></span><span></span><span></span>
+                        </div>
+                        <div class="code-title">ECHO SERVER — COMPLETE SOURCE</div>
+                    </div>
+                    <pre>
+<span class="cm">#include &lt;freeart/server_core.h&gt;</span>
+
+<span class="kw">struct</span> <span class="tp">my_context</span> {};   <span class="cm">// your per-connection state goes here</span>
+
+<span class="kw">class</span> <span class="tp">echo_handler</span> : <span class="kw">public</span> <span class="tp">freeart::ihandler</span>&lt;<span class="tp">my_context</span>&gt; {
+<span class="kw">public</span>:
+    <span class="kw">void</span> <span class="fn">on_connect</span>   (<span class="tp">freeart::server_core</span>&lt;<span class="tp">my_context</span>&gt;&amp;, <span class="tp">freeart::connection</span>&lt;<span class="tp">my_context</span>&gt;&amp;) <span class="kw">override</span> {}
+
+    <span class="kw">int</span>  <span class="fn">on_data</span>      (<span class="tp">freeart::server_core</span>&lt;<span class="tp">my_context</span>&gt;&amp;, <span class="tp">freeart::connection</span>&lt;<span class="tp">my_context</span>&gt;&amp; conn,
+                      <span class="kw">const</span> <span class="tp">uint8_t</span>* data, <span class="tp">size_t</span> len) <span class="kw">override</span> {
+        conn.<span class="fn">send</span>(data, len);         <span class="cm">// echo back</span>
+        <span class="kw">return</span> <span class="kw">static_cast</span>&lt;<span class="kw">int</span>&gt;(len); <span class="cm">// consumed all bytes</span>
+    }
+
+    <span class="kw">void</span> <span class="fn">on_disconnect</span>(<span class="tp">freeart::server_core</span>&lt;<span class="tp">my_context</span>&gt;&amp;, <span class="tp">freeart::connection</span>&lt;<span class="tp">my_context</span>&gt;&amp;) <span class="kw">override</span> {}
+};
+
+<span class="kw">int</span> <span class="fn">main</span>() {
+    <span class="tp">freeart::server_config</span> cfg;
+    cfg.port = <span class="st">9000</span>;
+
+    <span class="tp">freeart::server_core</span>&lt;<span class="tp">my_context</span>&gt; server(cfg, std::make_unique&lt;<span class="tp">echo_handler</span>&gt;());
+    server.<span class="fn">run</span>();
+}
+</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- AUTHOR -->
+        <section id="author">
+            <div class="container">
+                <div class="section-label">// author</div>
+                <h2>Developer</h2>
+                <div class="author-card">
+                    <div class="author-avatar">🛠</div>
+                    <div>
+                        <div class="author-name">Ahmad Sadaqa</div>
+                        <div class="author-handle">github.com/ahule</div>
+                        <p class="author-desc">
+                            Systems programmer and the original author of FreeArt.
+                            Interested in low-level networking, performance engineering,
+                            and building tools that remove friction from server development.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- LICENSE -->
+        <section id="license">
+            <div class="container">
+                <div class="section-label">// license</div>
+                <h2>License</h2>
+                <div class="license-box">
+                    <div class="license-icon">⚖️</div>
+                    <div>
+                        <h3>GNU General Public License v2.0</h3>
+                        <p>
+                            FreeArt is free software: you can redistribute it and/or modify it under the
+                            terms of the GNU General Public License as published by the Free Software Foundation,
+                            either version 2 of the License, or (at your option) any later version.
+                        </p>
+                        <p style="margin-top:.75rem">
+                            This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+                            without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+                            See the <a href="LICENSE" style="color:var(--accent);text-decoration:none">LICENSE</a> file
+                            for full details.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div><!-- /page -->
+
+    <footer>
+        <div class="container">
+            <strong style="color:var(--text-2)">FreeArt</strong> &mdash;
+            built by <span>Ahmad Sadaqa</span> &mdash;
+            licensed under <span>GPLv2</span>
+        </div>
+    </footer>
+
+</body>
+
+</html>
